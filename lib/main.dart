@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:barcode_scan/barcode_scan.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+const String prop_buyer_login = "buyer_login";
 
 void main() => runApp(MyApp());
 
@@ -47,13 +50,36 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String _status = "";
+  String _buyerLogin = "";
   List<String> _scanList = List();
   int _selectedScanIdx = -1;
 
+  static const String _prop_scanlist = "scanlist";
+
+  _saveScanList() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      prefs.setStringList(_prop_scanlist, _scanList);
+    });
+  }
+
   Future scan() async {
     try {
-      String barcode = await BarcodeScanner.scan();
-      setState(() => this._scanList.add(barcode));
+      String qrCode = await BarcodeScanner.scan();
+      if( _scanList.indexOf(qrCode) >=0 )
+      {
+        setState(() {
+          this._status = 'Чек есть в списке отсканированных';
+        });
+      }
+      else
+      {
+        _scanList.add(qrCode);
+        _saveScanList();
+        setState(() {
+          this._status = 'Чек отсканирован';
+        });
+      }
     } on PlatformException catch (e) {
       if (e.code == BarcodeScanner.CameraAccessDenied) {
         setState(() {
@@ -79,19 +105,34 @@ class _MyHomePageState extends State<MyHomePage> {
             + " " + part.substring(11, 13) + ":" + part.substring(13, 15);
         break;
       }
-    };
+    }
     for(var part in list) {
       if (part.startsWith("s=") && part.length > 2) {
         out += " " + part.substring(2);
         break;
       }
-    };
+    }
     return out;
   }
-  
+
+  _loadSettings() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _buyerLogin = (prefs.getString (prop_buyer_login ?? ""));
+      _scanList = (prefs.getStringList(_prop_scanlist) ?? List());
+    });
+  }
+
+  _deleteAll() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      prefs.remove(_prop_scanlist);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    List<String> _array = [];
+    _loadSettings();
     // This method is rerun every time setState is called, for instance as done
     // by the _incrementCounter method above.
     //
@@ -136,11 +177,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     onPressed: () {},
                     child: const Text('Отправить', style: TextStyle(fontSize: 15)),
                   ),
-                  const SizedBox(width: 15),
-                  RaisedButton(
-                    onPressed: () {},
-                    child: const Text('Удалить', style: TextStyle(fontSize: 15)),
-                  ),
+                  Expanded(
+                      child: Center(
+                          child: Text(_buyerLogin, style: TextStyle(fontSize: 15))
+                      )
+                  )
                 ]
             ),
             Text(_status, textAlign: TextAlign.center,),
@@ -165,8 +206,17 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: <Widget>[
                   RaisedButton(
                     onPressed: () {
-                      setState(() => this._scanList.clear());
+                      if(_selectedScanIdx == -1)
+                        return;
+                      _scanList.removeAt(_selectedScanIdx);
+                      _selectedScanIdx = -1;
+                      _saveScanList();
                     },
+                    child: const Text('Удалить', style: TextStyle(fontSize: 15)),
+                  ),
+                  const SizedBox(width: 15),
+                  RaisedButton(
+                    onPressed: _deleteAll,
                     child: const Text('Удалить все', style: TextStyle(fontSize: 15)),
                   ),
                   const SizedBox(width: 15),
@@ -195,9 +245,43 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsState extends State<SettingsScreen> {
+  static const String _prop_login = "login";
+  static const String _prop_passwd = "passwd";
+
   @override
   initState() {
     super.initState();
+    _loadSettings();
+  }
+
+  var loginTxt = new TextEditingController();
+  var passwdTxt = new TextEditingController();
+  var buyerLoginTxt = new TextEditingController();
+
+  _loadSettings() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      loginTxt.text = (prefs.getString (_prop_login) ?? "");
+      passwdTxt.text = (prefs.getString (_prop_passwd) ?? "");
+      buyerLoginTxt.text = (prefs.getString (prop_buyer_login) ?? "");
+    });
+  }
+
+  _saveSettings() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setString(_prop_login, loginTxt.text);
+    prefs.setString(_prop_passwd, passwdTxt.text);
+    prefs.setString(prop_buyer_login, buyerLoginTxt.text);
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          // Retrieve the text the that user has entered by using the
+          // TextEditingController.
+          content: Text("Настройки сохранены"),
+        );
+      },
+    );
   }
 
   @override
@@ -212,6 +296,7 @@ class _SettingsState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               TextField(
+                controller: loginTxt,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(),
                   labelText: 'Логин',
@@ -219,10 +304,19 @@ class _SettingsState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 15),
               TextField(
+                controller: passwdTxt,
                 obscureText: true,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(),
                   labelText: 'Пароль',
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: buyerLoginTxt,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Логин покупателя',
                 ),
               ),
               Padding(
@@ -231,7 +325,9 @@ class _SettingsState extends State<SettingsScreen> {
                     color: Colors.blue,
                     textColor: Colors.white,
                     splashColor: Colors.blueGrey,
-                    onPressed: () {},
+                    onPressed: () {
+                      _saveSettings();
+                    },
                     child: const Text('Сохранить')
                 ),
               )
