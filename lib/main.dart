@@ -118,7 +118,7 @@ class _MyHomePageState extends State<MyHomePage> {
   _loadSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _buyerLogin = (prefs.getString (prop_buyer_login ?? ""));
+      _buyerLogin = (prefs.getString (prop_buyer_login) ?? "");
       _scanList = (prefs.getStringList(_prop_scanlist) ?? List());
     });
   }
@@ -207,10 +207,18 @@ class _MyHomePageState extends State<MyHomePage> {
                   RaisedButton(
                     onPressed: () {
                       if(_selectedScanIdx == -1)
+                      {
+                        setState(() {
+                          this._status = 'Не выбран чек для удаления';
+                        });
                         return;
+                      }
                       _scanList.removeAt(_selectedScanIdx);
                       _selectedScanIdx = -1;
                       _saveScanList();
+                      setState(() {
+                        this._status = 'Чек удален';
+                      });
                     },
                     child: const Text('Удалить', style: TextStyle(fontSize: 15)),
                   ),
