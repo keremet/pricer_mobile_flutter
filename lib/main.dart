@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:barcode_scan/barcode_scan.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
+const String prop_login = "login";
+const String prop_passwd = "passwd";
 const String prop_buyer_login = "buyer_login";
 
 void main() => runApp(MyApp());
@@ -50,6 +53,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String _status = "";
+  String _login = "";
   String _buyerLogin = "";
   List<String> _scanList = List();
   int _selectedScanIdx = -1;
@@ -95,6 +99,46 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  _btnSendPressed() async {
+    if( _scanList.length == 0 ) {
+      setState(() { _status = 'Нет чеков для отправки'; });
+      return;
+    }
+
+    if( _login.isEmpty ) {
+      setState(() { _status = 'Введите логин в настройках'; });
+      return;
+    }
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String passwd = prefs.getString (prop_passwd);
+    if( passwd == null || passwd.isEmpty ) {
+      setState(() { _status = 'Введите пароль в настройках'; });
+      return;
+    }
+
+    setState(() { _status = 'Ожидание ответа сервера'; });
+    String codes = "";
+    for( var qrCode in _scanList)
+    {
+      codes += qrCode + ';';
+    }
+    try {
+      var response = await http.post("http://orv.org.ru/pricer/api/receipt/send.php?v=190615&login="+_login+"&passwd="+passwd+"&buyer_login="+_buyerLogin,
+          body: codes);
+
+      setState(() {
+        if( 200 == response.statusCode ) {
+          _status = response.body;
+        } else {
+          _status = "Код ответа ${response.statusCode}. " + response.body;
+        }
+      });
+    } catch (error) {
+      setState(() { _status = "Ошибка отправки " + error.toString(); });
+    }
+  }
+
   String getReadableScan(String s)
   {
     String out = "";
@@ -118,7 +162,8 @@ class _MyHomePageState extends State<MyHomePage> {
   _loadSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _buyerLogin = (prefs.getString (prop_buyer_login) ?? "");
+      _buyerLogin = prefs.getString (prop_buyer_login) ?? "";
+      _login = prefs.getString (prop_login) ?? "";
       _scanList = (prefs.getStringList(_prop_scanlist) ?? List());
     });
   }
@@ -164,22 +209,17 @@ class _MyHomePageState extends State<MyHomePage> {
             Row(
                 children: <Widget>[
                   RaisedButton(
-                    onPressed: scan, /*() {
-                      Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ScanScreen()),
-                      );
-                    }, */
+                    onPressed: scan,
                     child: const Text('Сканировать', style: TextStyle(fontSize: 15)),
                   ),
                   const SizedBox(width: 15),
                   RaisedButton(
-                    onPressed: () {},
+                    onPressed: _btnSendPressed,
                     child: const Text('Отправить', style: TextStyle(fontSize: 15)),
                   ),
                   Expanded(
                       child: Center(
-                          child: Text(_buyerLogin, style: TextStyle(fontSize: 15))
+                          child: Text( _buyerLogin.isNotEmpty ? _buyerLogin : _login, style: TextStyle(fontSize: 15))
                       )
                   )
                 ]
@@ -253,9 +293,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsState extends State<SettingsScreen> {
-  static const String _prop_login = "login";
-  static const String _prop_passwd = "passwd";
-
   @override
   initState() {
     super.initState();
@@ -269,16 +306,16 @@ class _SettingsState extends State<SettingsScreen> {
   _loadSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      loginTxt.text = (prefs.getString (_prop_login) ?? "");
-      passwdTxt.text = (prefs.getString (_prop_passwd) ?? "");
+      loginTxt.text = (prefs.getString (prop_login) ?? "");
+      passwdTxt.text = (prefs.getString (prop_passwd) ?? "");
       buyerLoginTxt.text = (prefs.getString (prop_buyer_login) ?? "");
     });
   }
 
   _saveSettings() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setString(_prop_login, loginTxt.text);
-    prefs.setString(_prop_passwd, passwdTxt.text);
+    prefs.setString(prop_login, loginTxt.text);
+    prefs.setString(prop_passwd, passwdTxt.text);
     prefs.setString(prop_buyer_login, buyerLoginTxt.text);
     return showDialog(
       context: context,
