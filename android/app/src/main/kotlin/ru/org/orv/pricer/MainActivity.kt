@@ -1,4 +1,4 @@
-package ru.org.orv.flutterhelloworld
+package ru.org.orv.pricer
 
 import android.os.Bundle
 
