@@ -69,7 +69,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future scan() async {
     try {
-      String qrCode = await BarcodeScanner.scan();
+      String qrCode = await BarcodeScanner.scan(flash:true);
       if( _scanList.indexOf(qrCode) >=0 )
       {
         setState(() {
