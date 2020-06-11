@@ -209,13 +209,27 @@ class _MyHomePageState extends State<MyHomePage> {
             Row(
                 children: <Widget>[
                   RaisedButton(
-                    onPressed: scan,
-                    child: const Text('Сканировать', style: TextStyle(fontSize: 15)),
+                    onPressed:  () {
+                      if(_selectedScanIdx == -1)
+                      {
+                        setState(() {
+                          this._status = 'Не выбран чек для удаления';
+                        });
+                        return;
+                      }
+                      _scanList.removeAt(_selectedScanIdx);
+                      _selectedScanIdx = -1;
+                      _saveScanList();
+                      setState(() {
+                        this._status = 'Чек удален';
+                      });
+                    },
+                    child: const Text('Удалить', style: TextStyle(fontSize: 15)),
                   ),
                   const SizedBox(width: 15),
                   RaisedButton(
-                    onPressed: _btnSendPressed,
-                    child: const Text('Отправить', style: TextStyle(fontSize: 15)),
+                    onPressed: _deleteAll,
+                    child: const Text('Удалить все', style: TextStyle(fontSize: 15)),
                   ),
                   Expanded(
                       child: Center(
@@ -245,27 +259,13 @@ class _MyHomePageState extends State<MyHomePage> {
             Row(
                 children: <Widget>[
                   RaisedButton(
-                    onPressed: () {
-                      if(_selectedScanIdx == -1)
-                      {
-                        setState(() {
-                          this._status = 'Не выбран чек для удаления';
-                        });
-                        return;
-                      }
-                      _scanList.removeAt(_selectedScanIdx);
-                      _selectedScanIdx = -1;
-                      _saveScanList();
-                      setState(() {
-                        this._status = 'Чек удален';
-                      });
-                    },
-                    child: const Text('Удалить', style: TextStyle(fontSize: 15)),
+                    onPressed: scan,
+                    child: const Text('Сканировать', style: TextStyle(fontSize: 15)),
                   ),
                   const SizedBox(width: 15),
                   RaisedButton(
-                    onPressed: _deleteAll,
-                    child: const Text('Удалить все', style: TextStyle(fontSize: 15)),
+                    onPressed: _btnSendPressed,
+                    child: const Text('Отправить', style: TextStyle(fontSize: 15)),
                   ),
                   const SizedBox(width: 15),
                   RaisedButton(
